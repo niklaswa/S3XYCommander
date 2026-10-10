@@ -17,10 +17,17 @@ public struct VehicleData: Sendable, Equatable {
     /// Accelerator pedal position (percent).
     public var accelPedalPercent: UInt32?
     public var turnSignalLeft: TurnSignalStatus?
+    /// The number behind ``turnSignalLeft``, kept even when no case matches it.
+    public var turnSignalLeftRaw: UInt32?
     public var turnSignalRight: TurnSignalStatus?
+    /// The number behind ``turnSignalRight``, kept even when no case matches it.
+    public var turnSignalRightRaw: UInt32?
     public var brakePressed: Bool?
-    /// Shifter position (0=P, 1=R, 2=N, 3=D).
+    /// Shifter position. See ``Gear`` for how sure the mapping is.
     public var gear: Gear?
+    /// The number the Commander sent for the gear, kept even when ``Gear``
+    /// has no case for it.
+    public var gearRaw: UInt32?
     public var regenLevel: UInt32?
     public var driftModeState: UInt32?
     public var trackModeState: UInt32?
@@ -111,20 +118,42 @@ public struct VehicleData: Sendable, Equatable {
     public var climateSeatCoolingFR: UInt32?
 
     // MARK: Autopilot
+    /// A bare `uint32` in the descriptor (see the enum sidecars below), encoding
+    /// not confirmed. Candidates: Tesla's DAS_autopilotState (3 active,
+    /// 4 restricted, 5 Navigate on Autopilot) or Enhauto's own `CurrApState`.
     public var autopilotCurrentState: UInt32?
     public var autopilotBlindSpotRearLeft: BlindSpotState?
+    /// The number behind ``autopilotBlindSpotRearLeft``, kept even when no case matches it.
+    public var autopilotBlindSpotRearLeftRaw: UInt32?
     public var autopilotBlindSpotRearRight: BlindSpotState?
+    /// The number behind ``autopilotBlindSpotRearRight``, kept even when no case matches it.
+    public var autopilotBlindSpotRearRightRaw: UInt32?
+    /// `AutopilotHandsOnState` in the descriptor: 0 not required, 1 required
+    /// and detected, 2 required but not detected, 3 visual warning, 4/5 chime,
+    /// 6 slowing, 7 struck out, 8 suspended, 9/10 escalated chime, 15 SNA.
     public var autopilotHandsOnState: UInt32?
     public var autopilotFollowDistance: UInt32?
     public var autopilotSpeedLimit: UInt32?
 
     // MARK: Doors / Latches
     public var doorFrontLeft: LatchStatus?
+    /// The number behind ``doorFrontLeft``, kept even when no case matches it.
+    public var doorFrontLeftRaw: UInt32?
     public var doorFrontRight: LatchStatus?
+    /// The number behind ``doorFrontRight``, kept even when no case matches it.
+    public var doorFrontRightRaw: UInt32?
     public var doorRearLeft: LatchStatus?
+    /// The number behind ``doorRearLeft``, kept even when no case matches it.
+    public var doorRearLeftRaw: UInt32?
     public var doorRearRight: LatchStatus?
+    /// The number behind ``doorRearRight``, kept even when no case matches it.
+    public var doorRearRightRaw: UInt32?
     public var frunk: LatchStatus?
+    /// The number behind ``frunk``, kept even when no case matches it.
+    public var frunkRaw: UInt32?
     public var trunk: LatchStatus?
+    /// The number behind ``trunk``, kept even when no case matches it.
+    public var trunkRaw: UInt32?
     public var carLocked: UInt32?
     public var childUnlockLeft: UInt32?
     public var childUnlockRight: UInt32?
@@ -150,7 +179,11 @@ public struct VehicleData: Sendable, Equatable {
 
     // MARK: Media
     public var mediaPlaybackStatus: MediaPlaybackStatus?
+    /// The number behind ``mediaPlaybackStatus``, kept even when no case matches it.
+    public var mediaPlaybackStatusRaw: UInt32?
     public var mediaNowPlayingSource: MediaSource?
+    /// The number behind ``mediaNowPlayingSource``, kept even when no case matches it.
+    public var mediaNowPlayingSourceRaw: UInt32?
     public var mediaNowPlayingArtist: String?
     public var mediaNowPlayingTitle: String?
     public var mediaNowPlayingAlbum: String?
@@ -193,10 +226,10 @@ public struct VehicleData: Sendable, Equatable {
         // Hand-rolled merge is faster and keeps us type-safe:
         if let v = speedKmh                  { m.speedKmh = v }
         if let v = accelPedalPercent         { m.accelPedalPercent = v }
-        if let v = turnSignalLeft            { m.turnSignalLeft = v }
-        if let v = turnSignalRight           { m.turnSignalRight = v }
+        Self.merge(turnSignalLeft, turnSignalLeftRaw, into: &m.turnSignalLeft, &m.turnSignalLeftRaw)
+        Self.merge(turnSignalRight, turnSignalRightRaw, into: &m.turnSignalRight, &m.turnSignalRightRaw)
         if let v = brakePressed              { m.brakePressed = v }
-        if let v = gear                      { m.gear = v }
+        Self.merge(gear, gearRaw, into: &m.gear, &m.gearRaw)
         if let v = regenLevel                { m.regenLevel = v }
         if let v = driftModeState            { m.driftModeState = v }
         if let v = trackModeState            { m.trackModeState = v }
@@ -272,17 +305,19 @@ public struct VehicleData: Sendable, Equatable {
         if let v = climateSeatCoolingFL      { m.climateSeatCoolingFL = v }
         if let v = climateSeatCoolingFR      { m.climateSeatCoolingFR = v }
         if let v = autopilotCurrentState     { m.autopilotCurrentState = v }
-        if let v = autopilotBlindSpotRearLeft  { m.autopilotBlindSpotRearLeft = v }
-        if let v = autopilotBlindSpotRearRight { m.autopilotBlindSpotRearRight = v }
+        Self.merge(autopilotBlindSpotRearLeft, autopilotBlindSpotRearLeftRaw,
+                   into: &m.autopilotBlindSpotRearLeft, &m.autopilotBlindSpotRearLeftRaw)
+        Self.merge(autopilotBlindSpotRearRight, autopilotBlindSpotRearRightRaw,
+                   into: &m.autopilotBlindSpotRearRight, &m.autopilotBlindSpotRearRightRaw)
         if let v = autopilotHandsOnState     { m.autopilotHandsOnState = v }
         if let v = autopilotFollowDistance   { m.autopilotFollowDistance = v }
         if let v = autopilotSpeedLimit       { m.autopilotSpeedLimit = v }
-        if let v = doorFrontLeft             { m.doorFrontLeft = v }
-        if let v = doorFrontRight            { m.doorFrontRight = v }
-        if let v = doorRearLeft              { m.doorRearLeft = v }
-        if let v = doorRearRight             { m.doorRearRight = v }
-        if let v = frunk                     { m.frunk = v }
-        if let v = trunk                     { m.trunk = v }
+        Self.merge(doorFrontLeft, doorFrontLeftRaw, into: &m.doorFrontLeft, &m.doorFrontLeftRaw)
+        Self.merge(doorFrontRight, doorFrontRightRaw, into: &m.doorFrontRight, &m.doorFrontRightRaw)
+        Self.merge(doorRearLeft, doorRearLeftRaw, into: &m.doorRearLeft, &m.doorRearLeftRaw)
+        Self.merge(doorRearRight, doorRearRightRaw, into: &m.doorRearRight, &m.doorRearRightRaw)
+        Self.merge(frunk, frunkRaw, into: &m.frunk, &m.frunkRaw)
+        Self.merge(trunk, trunkRaw, into: &m.trunk, &m.trunkRaw)
         if let v = carLocked                 { m.carLocked = v }
         if let v = childUnlockLeft           { m.childUnlockLeft = v }
         if let v = childUnlockRight          { m.childUnlockRight = v }
@@ -301,8 +336,10 @@ public struct VehicleData: Sendable, Equatable {
         if let v = navMinutesToArrival       { m.navMinutesToArrival = v }
         if let v = navEnergyAtArrival        { m.navEnergyAtArrival = v }
         if let v = navTrafficMinutesDelay    { m.navTrafficMinutesDelay = v }
-        if let v = mediaPlaybackStatus       { m.mediaPlaybackStatus = v }
-        if let v = mediaNowPlayingSource     { m.mediaNowPlayingSource = v }
+        Self.merge(mediaPlaybackStatus, mediaPlaybackStatusRaw,
+                   into: &m.mediaPlaybackStatus, &m.mediaPlaybackStatusRaw)
+        Self.merge(mediaNowPlayingSource, mediaNowPlayingSourceRaw,
+                   into: &m.mediaNowPlayingSource, &m.mediaNowPlayingSourceRaw)
         if let v = mediaNowPlayingArtist     { m.mediaNowPlayingArtist = v }
         if let v = mediaNowPlayingTitle      { m.mediaNowPlayingTitle = v }
         if let v = mediaNowPlayingAlbum      { m.mediaNowPlayingAlbum = v }
@@ -322,15 +359,90 @@ public struct VehicleData: Sendable, Equatable {
         if let v = currentTimeSeconds        { m.currentTimeSeconds = v }
         return m
     }
+
+    /// A typed field travels with its raw number, and the number decides: a
+    /// delta that carries one replaces both, so a value without a case clears
+    /// the typed field instead of leaving the previous case standing. A typed
+    /// value set by hand without a number replaces the case and drops the
+    /// stale number.
+    private static func merge<T>(_ value: T?, _ raw: UInt32?,
+                                 into base: inout T?, _ baseRaw: inout UInt32?) {
+        if let raw {
+            base = value
+            baseRaw = raw
+        } else if let value {
+            base = value
+            baseRaw = nil
+        }
+    }
 }
 
 // MARK: - Enum sidecars
+//
+// Raw values are the Commander's wire values. Every typed field keeps its
+// number in a `…Raw` sibling as well, so a value without a case is never lost.
+// "The descriptor" below means the proto descriptors compiled into Enhauto's
+// S3XY app 6.8.4. What is confirmed in the car: README, "Verify in the car".
 
-public enum Gear: UInt32, Sendable { case park = 0, reverse = 1, neutral = 2, drive = 3 }
-public enum TurnSignalStatus: UInt32, Sendable { case off = 0, on = 1 }
-public enum BlindSpotState: UInt32, Sendable { case clear = 0, warning = 1 }
-public enum LatchStatus: UInt32, Sendable { case closed = 0, open = 1, ajar = 2 }
+/// Shifter position, field 66.
+///
+/// This declaration is the only place the mapping lives: if the car
+/// disagrees, change the numbers here. Not confirmed for field 66, which the
+/// descriptor types as a bare `uint32`. The values are Tesla's DI_gear
+/// (0 invalid, 1 P, 2 R, 3 N, 4 D, 7 SNA), which is how Enhauto's app reads the
+/// Commander's gear on its dashboard endpoint (`CDashboardData::UpdateGearValue`:
+/// 2 R, 3 N, 4 D, anything else P). 0 and 7 have no case and only show up in
+/// ``VehicleData/gearRaw``.
+public enum Gear: UInt32, Sendable { case park = 1, reverse = 2, neutral = 3, drive = 4 }
+
+/// `TurnSignalStatus` in the descriptor: 0 off, 1 active low, 2 active high.
+/// Both active values mean the indicator is on; what tells them apart is not
+/// confirmed, the `…Raw` fields keep it.
+public enum TurnSignalStatus: UInt32, Sendable {
+    case off = 0, on = 1
+
+    init?(wireValue: UInt32) {
+        switch wireValue {
+        case 0: self = .off
+        case 1, 2: self = .on
+        default: return nil
+        }
+    }
+}
+
+/// `BlindSpotState` in the descriptor: 0 no warning, 1 warning level 1,
+/// 2 warning level 2, 3 SNA (no case).
+public enum BlindSpotState: UInt32, Sendable {
+    case clear = 0, warning = 1
+
+    init?(wireValue: UInt32) {
+        switch wireValue {
+        case 0: self = .clear
+        case 1, 2: self = .warning
+        default: return nil
+        }
+    }
+}
+
+/// `LatchStatus` in the descriptor: 0 SNA, 1 opened, 2 closed, 3 closing,
+/// 4 opening, 5 ajar, 6 timeout, 7 default, 8 fault. Closing and opening count
+/// as open; SNA, timeout, default and fault have no case.
+public enum LatchStatus: UInt32, Sendable {
+    case closed = 2, open = 1, ajar = 5
+
+    init?(wireValue: UInt32) {
+        switch wireValue {
+        case 1, 3, 4: self = .open
+        case 2: self = .closed
+        case 5: self = .ajar
+        default: return nil
+        }
+    }
+}
+
+/// `MediaPlaybackStatus` in the descriptor, same values.
 public enum MediaPlaybackStatus: UInt32, Sendable { case stopped = 0, playing = 1, paused = 2 }
+/// `MediaSourceType` in the descriptor, same values.
 public enum MediaSource: UInt32, Sendable {
     case none = 0, am = 1, fm = 2, xm = 3, slacker = 5, localFiles = 6, iPod = 7
     case bluetooth = 8, auxIn = 9, dab = 10, rdio = 11, spotify = 12, usRadio = 13
@@ -361,8 +473,8 @@ enum VehicleDataDecoder {
             case (9, 5):   v.navEnergyAtArrival = Float(bitPattern: try readFixed32(&r))
             case (10, 5):  v.navTrafficMinutesDelay = Float(bitPattern: try readFixed32(&r))
             // Media
-            case (11, 0):  v.mediaPlaybackStatus = MediaPlaybackStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (12, 0):  v.mediaNowPlayingSource = MediaSource(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
+            case (11, 0):  (v.mediaPlaybackStatus, v.mediaPlaybackStatusRaw) = enumField(try r.readVarint(), MediaPlaybackStatus.init(rawValue:))
+            case (12, 0):  (v.mediaNowPlayingSource, v.mediaNowPlayingSourceRaw) = enumField(try r.readVarint(), MediaSource.init(rawValue:))
             case (13, 2):  v.mediaNowPlayingArtist = String(data: try r.readBytes(), encoding: .utf8)
             case (14, 2):  v.mediaNowPlayingTitle = String(data: try r.readBytes(), encoding: .utf8)
             case (15, 2):  v.mediaNowPlayingSourceString = String(data: try r.readBytes(), encoding: .utf8)
@@ -417,10 +529,10 @@ enum VehicleDataDecoder {
             // Driving state
             case (61, 0):  v.speedKmh = UInt32(truncatingIfNeeded: try r.readVarint())
             case (62, 0):  v.accelPedalPercent = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (63, 0):  v.turnSignalLeft = TurnSignalStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (64, 0):  v.turnSignalRight = TurnSignalStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
+            case (63, 0):  (v.turnSignalLeft, v.turnSignalLeftRaw) = enumField(try r.readVarint(), TurnSignalStatus.init(wireValue:))
+            case (64, 0):  (v.turnSignalRight, v.turnSignalRightRaw) = enumField(try r.readVarint(), TurnSignalStatus.init(wireValue:))
             case (65, 0):  v.brakePressed = (try r.readVarint()) != 0
-            case (66, 0):  v.gear = Gear(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
+            case (66, 0):  (v.gear, v.gearRaw) = enumField(try r.readVarint(), Gear.init(rawValue:))
             case (67, 0):  v.regenLevel = UInt32(truncatingIfNeeded: try r.readVarint())
             case (68, 0):  v.driftModeState = UInt32(truncatingIfNeeded: try r.readVarint())
             case (69, 0):  v.trackModeState = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -464,8 +576,8 @@ enum VehicleDataDecoder {
             case (104, 0): v.climateSeatCoolingFR = UInt32(truncatingIfNeeded: try r.readVarint())
             // Autopilot
             case (105, 0): v.autopilotCurrentState = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (106, 0): v.autopilotBlindSpotRearLeft = BlindSpotState(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (107, 0): v.autopilotBlindSpotRearRight = BlindSpotState(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
+            case (106, 0): (v.autopilotBlindSpotRearLeft, v.autopilotBlindSpotRearLeftRaw) = enumField(try r.readVarint(), BlindSpotState.init(wireValue:))
+            case (107, 0): (v.autopilotBlindSpotRearRight, v.autopilotBlindSpotRearRightRaw) = enumField(try r.readVarint(), BlindSpotState.init(wireValue:))
             case (108, 0): v.autopilotHandsOnState = UInt32(truncatingIfNeeded: try r.readVarint())
             case (109, 0): v.autopilotFollowDistance = UInt32(truncatingIfNeeded: try r.readVarint())
             case (110, 0): v.autopilotSpeedLimit = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -473,12 +585,12 @@ enum VehicleDataDecoder {
             case (111, 0): v.socPercent = UInt32(truncatingIfNeeded: try r.readVarint())
             case (112, 0): v.range = UInt32(truncatingIfNeeded: try r.readVarint())
             // Doors
-            case (113, 0): v.doorFrontLeft = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (114, 0): v.doorFrontRight = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (115, 0): v.doorRearLeft = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (116, 0): v.doorRearRight = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (117, 0): v.frunk = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
-            case (118, 0): v.trunk = LatchStatus(rawValue: UInt32(truncatingIfNeeded: try r.readVarint()))
+            case (113, 0): (v.doorFrontLeft, v.doorFrontLeftRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
+            case (114, 0): (v.doorFrontRight, v.doorFrontRightRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
+            case (115, 0): (v.doorRearLeft, v.doorRearLeftRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
+            case (116, 0): (v.doorRearRight, v.doorRearRightRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
+            case (117, 0): (v.frunk, v.frunkRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
+            case (118, 0): (v.trunk, v.trunkRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
             case (119, 0): v.carLocked = UInt32(truncatingIfNeeded: try r.readVarint())
             case (120, 0): v.childUnlockLeft = UInt32(truncatingIfNeeded: try r.readVarint())
             case (121, 0): v.childUnlockRight = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -501,5 +613,12 @@ enum VehicleDataDecoder {
     @inline(__always)
     private static func readFixed32(_ r: inout ProtoReader) throws -> UInt32 {
         try r.readFixed32()
+    }
+
+    /// An enum field: its case, if one matches, and always the number itself.
+    @inline(__always)
+    private static func enumField<T>(_ varint: UInt64, _ decode: (UInt32) -> T?) -> (T?, UInt32?) {
+        let raw = UInt32(truncatingIfNeeded: varint)
+        return (decode(raw), raw)
     }
 }

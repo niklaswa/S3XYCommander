@@ -117,6 +117,43 @@ The firmware pushes **only deltas**; each snapshot carries only fields that chan
 ### Display + misc
 `displayBrightness` / `State` / `Theme` · `driverOrPassengerPresent` · `othersHandWashState` · `othersCurrentTimeInSeconds`
 
+## Verify in the car
+
+Not every enum mapping has been checked against a real car. Every typed enum field keeps the number the Commander sent in a `…Raw` sibling (`gearRaw`, `turnSignalLeftRaw`, `autopilotBlindSpotRearLeftRaw`, `doorFrontLeftRaw`, `mediaPlaybackStatusRaw`, …). A value without a case still arrives there, and the typed field reads `nil`. `autopilotCurrentState` and `autopilotHandsOnState` are plain numbers already.
+
+Print the raw values:
+
+```swift
+for await snap in client.vehicleData {
+    let car = snap.accumulated
+    print("gear", car.gearRaw ?? 0,
+          "signal L/R", car.turnSignalLeftRaw ?? 0, car.turnSignalRightRaw ?? 0,
+          "blind spot L/R", car.autopilotBlindSpotRearLeftRaw ?? 0, car.autopilotBlindSpotRearRightRaw ?? 0,
+          "AP", car.autopilotCurrentState ?? 0, "hands", car.autopilotHandsOnState ?? 0)
+}
+```
+
+Close the S3XY app first. Anything that needs the car moving is read by a passenger.
+
+1. **Gear.** Foot on the brake, shift P → R → N → D and note `gearRaw` each time. Expected: P 1, R 2, N 3, D 4. If the car says otherwise, change the numbers in `enum Gear` in `VehicleData.swift`. The mapping lives only there.
+2. **Turn signals.** Tap the stalk (three blinks), then push it through to the stop, left and right. Expected: 0 while off, 1 or 2 while blinking. Note whether 1 and 2 alternate with the blink or depend on how far the stalk is pushed.
+3. **Blind spot.** On a multi-lane road, with a car alongside in the neighbouring lane, then with the indicator on towards it. Expected: 0 clear, 1 and 2 warning levels, 3 not available.
+4. **Autopilot.** Note `autopilotCurrentState` while off, with cruise control (TACC), with Autosteer, and on Navigate on Autopilot. If this is Tesla's DAS_autopilotState: 2 available, 3 active, 4 active but restricted, 5 Navigate on Autopilot. Hands off the wheel until the warning comes: `autopilotHandsOnState` should go 0 → 3 (visual) → 4/5 (chime).
+5. **Doors.** Open and close every door, the frunk and the trunk. Expected: 1 open, 2 closed. A powered trunk shows 4 while opening and 3 while closing.
+
+What is known about each mapping. "Descriptor" means the field's enum type and value names are in the proto descriptors compiled into Enhauto's S3XY app 6.8.4. Nothing in this table has been checked in the car yet.
+
+| Field | Mapping | Basis | In the car |
+|---|---|---|---|
+| `gear` (66) | 1 P, 2 R, 3 N, 4 D; 0 invalid and 7 SNA have no case | **Not from the descriptor**, which types the field as a bare `uint32`. These are Tesla's DI_gear values, and Enhauto's app reads the Commander's gear that way on its dashboard endpoint (2 R, 3 N, 4 D, anything else P). | open |
+| `turnSignalLeft` / `Right` (63/64) | 0 off; 1 (active low) and 2 (active high) both read as `.on` | Descriptor `TurnSignalStatus`. What separates 1 from 2 is unknown. | open |
+| `autopilotBlindSpotRearLeft` / `Right` (106/107) | 0 clear; 1 and 2 (warning levels) read as `.warning`; 3 SNA has no case | Descriptor `BlindSpotState` | open |
+| doors, `frunk`, `trunk` (113–118) | 1 opened, 2 closed, 3 closing, 4 opening, 5 ajar; closing and opening read as `.open`; 0 SNA, 6 timeout, 7 default and 8 fault have no case | Descriptor `LatchStatus` | open |
+| `autopilotCurrentState` (105) | plain number | **Unknown.** A bare `uint32` in the descriptor. It may be Tesla's DAS_autopilotState (as in the dashboard push) or Enhauto's own `CurrApState`. | open |
+| `autopilotHandsOnState` (108) | plain number; values in the property's doc comment | Descriptor `AutopilotHandsOnState` | open |
+| `mediaPlaybackStatus` (11) | 0 stopped, 1 playing, 2 paused | Descriptor `MediaPlaybackStatus` | open |
+| `mediaNowPlayingSource` (12) | see `MediaSource` | Descriptor `MediaSourceType` | open |
+
 ## Actions
 
 Fire one-shot actions on the Tesla's CAN bus, equivalent to pressing a

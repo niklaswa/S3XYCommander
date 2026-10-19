@@ -37,6 +37,7 @@ enum F {
 enum MsgType {
     static let ReqSendUUID: UInt32 = 32, RespSendUUID: UInt32 = 33
     static let ReqSubscribeVehicleData: UInt32 = 124, RespSubscribeVehicleData: UInt32 = 125
+    static let ReqSubscribeVehicleEventsData: UInt32 = 152, RespSubscribeVehicleEventsData: UInt32 = 153
 }
 enum PushType {
     static let VehicleDataHolder: UInt32 = 16
@@ -124,6 +125,15 @@ enum Build {
         outer.writeMessage(F.EP_pReqSubscribeVehicleData, inner.data)
         return outer.data
     }
+    /// `ReqSubscribeVehicleEventsData { subscribe_all }`: the scroll wheels.
+    static func subscribeVehicleEvents() -> Data {
+        var inner = ProtoWriter()
+        inner.writeBool(F.RSV_subscribe_all, true)
+        var outer = ProtoWriter()
+        outer.writeUInt32(F.EP_msgType, MsgType.ReqSubscribeVehicleEventsData)
+        outer.writeMessage(F.EP_pReqSubscribeVehicleEventsData, inner.data)
+        return outer.data
+    }
     static func unsubscribeAll() -> Data {
         var inner = ProtoWriter()
         inner.writeBool(F.RSV_unsubscribe_all, true)
@@ -208,18 +218,18 @@ enum Parse {
         }
         return (msg, CommanderStatus(rawValue: statusVal) ?? .internalError)
     }
-    /// Decode an EnhApiPushPayloadHolder into the raw PushVehicleDataHolder payload bytes
-    /// (nil if the push type is not VehicleData).
-    static func vehicleDataPushPayload(_ data: Data) throws -> Data? {
+    /// Decode an EnhApiPushPayloadHolder into its push type and the payload of
+    /// the two the library decodes: vehicle data and vehicle events.
+    static func push(_ data: Data) throws -> (type: UInt32, payload: Data?) {
         var r = ProtoReader(data); var pushType: UInt32 = 0; var payload: Data?
         while !r.atEnd {
             let t = try r.readTag()
             switch (t.field, t.wire) {
             case (F.EPP_pushType, 0): pushType = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (F.EPP_pPushVehicleDataHolder, 2): payload = try r.readBytes()
+            case (F.EPP_pPushVehicleDataHolder, 2), (F.EPP_pPushVehicleEventsDataHolder, 2): payload = try r.readBytes()
             default: try r.skip(wire: t.wire)
             }
         }
-        return pushType == PushType.VehicleDataHolder ? payload : nil
+        return (pushType, payload)
     }
 }

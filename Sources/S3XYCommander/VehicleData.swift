@@ -38,29 +38,50 @@ public struct VehicleData: Sendable, Equatable {
     public var wiperSpeed: UInt32?
 
     // MARK: Trip
-    /// Usable state-of-energy percent (0–100).
+    /// Usable state of energy, % (0–100): the charge the car shows. It is
+    /// (``nominalRemaining`` − ``energyBuffer``) / (``nominalFullPackNow`` − ``energyBuffer``).
     public var socPercent: UInt32?
-    /// Range remaining in km (or miles, depending on car's display units).
-    public var range: UInt32?
+    /// Range in miles, whatever the car displays: 223 at 77 % on a 74 kWh pack,
+    /// and it disagreed with the car's km. ``rangeKm`` converts it.
+    public var rangeMiles: UInt32?
 
     // MARK: BMS / battery
+    // Scales worked out in a Model 3 on 2026-10-19 (README, "Units"); the
+    // extension "In units" below converts them.
+    /// Pack voltage, 0.01 V (38930 = 389.30 V).
     public var batteryVoltage: UInt32?
+    /// Pack current, 0.1 A, negative while the pack gives energy (parked: −14,
+    /// −1.4 A, which at the pack's voltage is what the 12 V side drew).
     public var batteryCurrent: Int32?
     public var chargeStatus: UInt32?
+    /// Ideal energy left, 0.02 kWh (2888 = 57.76 kWh).
     public var idealEnergyRemaining: UInt32?
-    public var maxRegenPowerKw: UInt32?
-    public var maxDischargePowerKw: UInt32?
-    public var nominalFullPackNewKwhTimes10: UInt32?
-    public var nominalFullPackNowKwhTimes10: UInt32?
-    public var nominalRemainingKwhTimes10: UInt32?
-    public var energyBufferKwhTimes10: UInt32?
-    public var tempPtInletC: Int32?
-    public var tempBatteryInletC: Int32?
-    public var tempInletTargetC: Int32?
+    /// The most the pack takes while regenerating, 0.01 kW (7715 = 77.15 kW).
+    public var maxRegenPower: UInt32?
+    /// The most the pack gives, 0.01 kW (28838 = 288.38 kW).
+    public var maxDischargePower: UInt32?
+    /// Pack energy when new, 0.1 kWh (788 = 78.8 kWh).
+    public var nominalFullPackNew: UInt32?
+    /// Pack energy when full, now, 0.02 kWh (3713 = 74.26 kWh).
+    public var nominalFullPackNow: UInt32?
+    /// Energy left, 0.02 kWh (2900 = 58.0 kWh).
+    public var nominalRemaining: UInt32?
+    /// Energy held back below 0 %, 0.01 kWh (334 = 3.34 kWh).
+    public var energyBuffer: UInt32?
+    /// Coolant at the powertrain and battery inlets, and the inlet target.
+    /// Unit not confirmed: parked with the cells at 33 °C they read 131, 127
+    /// and 120 — 0.1 °C or 0.25 °C.
+    public var tempPtInlet: Int32?
+    public var tempBatteryInlet: Int32?
+    public var tempInletTarget: Int32?
+    /// Warmest and coldest cell, °C (33 and 32 parked after a drive; plausible,
+    /// not cross-checked).
     public var cellMaxTempC: Int32?
     public var cellMinTempC: Int32?
+    /// Highest and lowest cell voltage, 0.002 V (2027 = 4.054 V at 78 %).
     public var cellMaxVoltage: UInt32?
     public var cellMinVoltage: UInt32?
+    /// Lifetime energy, Wh: charged over AC and DC, regenerated, given by the pack.
     public var acChargeTotal: UInt32?
     public var dcChargeTotal: UInt32?
     public var regenTotal: UInt32?
@@ -68,6 +89,7 @@ public struct VehicleData: Sendable, Equatable {
     public var batteryHeatingState: UInt32?
 
     // MARK: Drivetrain
+    // Torque and power: 0 parked; their scale is still to be seen while driving.
     public var frontTorque: Int32?
     public var frontPowerKw: Int32?
     public var rearTorque: Int32?
@@ -76,19 +98,26 @@ public struct VehicleData: Sendable, Equatable {
     public var rearRightPowerKw: Int32?
     public var trackModeStability: UInt32?
     public var trackModeHandling: UInt32?
+    /// Stator temperatures, °C (18 and 17 parked, the air at 16 °C).
     public var tempFrontStatorC: Int32?
     public var tempRearStatorC: Int32?
     public var invertersCount: UInt32?
     public var rideAndHandling: UInt32?
 
     // MARK: Charging
+    /// DC fast charging; scale still to be seen at a charger (14 parked, not charging).
     public var chargingDcCurrent: Int32?
     public var chargingDcVoltage: Int32?
+    /// The low-voltage (16 V) side, 0.01 V (1556 = 15.56 V).
     public var lowBusVoltage: Int32?
+    /// The low-voltage side's current, 0.1 A (304 = 30.4 A).
     public var lowBusCurrent: Int32?
+    /// The high-voltage bus, 0.1 V (3886 = 388.6 V, next to the pack's 389.25 V).
     public var highBusVoltage: Int32?
 
     // MARK: Lights
+    // 0 off, 17 on for daytime, low, high beam and parking lights: one bit per
+    // side, it seems (0x01, 0x10) — the single rear fog lamp reads 1.
     public var lightsDrl: UInt32?
     public var lightsLowBeam: UInt32?
     public var lightsHighBeam: UInt32?
@@ -96,6 +125,8 @@ public struct VehicleData: Sendable, Equatable {
     public var lightsFogRear: UInt32?
     public var lightsPark: UInt32?
     public var autoHighBeamEnabled: UInt32?
+    /// The light switch, `LightSwitchStatus`: 0 auto, 1 on, 3 off (2, parking
+    /// lights, not seen).
     public var autoLights: UInt32?
 
     // MARK: Climate
@@ -131,8 +162,10 @@ public struct VehicleData: Sendable, Equatable {
     /// `AutopilotHandsOnState` in the descriptor: 0 not required, 1 required
     /// and detected, 2 required but not detected, 3 visual warning, 4/5 chime,
     /// 6 slowing, 7 struck out, 8 suspended, 9/10 escalated chime, 15 SNA.
+    /// Parked it goes between 2 and 1 as a hand turns the wheel's rollers.
     public var autopilotHandsOnState: UInt32?
     public var autopilotFollowDistance: UInt32?
+    /// The speed limit the car knows, in its display units (30 in a 30 km/h street).
     public var autopilotSpeedLimit: UInt32?
 
     // MARK: Doors / Latches
@@ -154,18 +187,25 @@ public struct VehicleData: Sendable, Equatable {
     public var trunk: LatchStatus?
     /// The number behind ``trunk``, kept even when no case matches it.
     public var trunkRaw: UInt32?
+    /// 1 locked, 0 unlocked.
     public var carLocked: UInt32?
     public var childUnlockLeft: UInt32?
     public var childUnlockRight: UInt32?
 
     // MARK: Sensors
+    /// Outside air, °C.
     public var outsideTempC: Int32?
-    public var brakeTempFrontLeftC: Int32?
-    public var brakeTempFrontRightC: Int32?
-    public var brakeTempRearLeftC: Int32?
-    public var brakeTempRearRightC: Int32?
+    /// The car's brake temperature estimates. Unit not confirmed: parked they
+    /// read 6 to 11 and rose, with the air at 16 °C.
+    public var brakeTempFrontLeft: Int32?
+    public var brakeTempFrontRight: Int32?
+    public var brakeTempRearLeft: Int32?
+    public var brakeTempRearRight: Int32?
 
     // MARK: Navigation
+    // From the car's API, which the Commander reaches as a paired key (Enhauto's
+    // "Tesla API" add-on); without it these stay empty. The car's own position
+    // came as 0, 0 while its location name came.
     public var navCarLatitude: Float?
     public var navCarLongitude: Float?
     public var navCarLocationName: String?
@@ -190,6 +230,8 @@ public struct VehicleData: Sendable, Equatable {
     public var mediaNowPlayingStation: String?
     public var mediaNowPlayingSourceString: String?
     public var mediaA2dpSourceName: String?
+    /// Duration, elapsed time and volume: the Commander sent 0 or nothing, with
+    /// Spotify and DAB radio playing and the volume turned (2026-10-19).
     public var mediaNowPlayingDurationSec: Int32?
     public var mediaNowPlayingElapsedSec: Int32?
     public var mediaAudioVolume: UInt32?
@@ -204,6 +246,7 @@ public struct VehicleData: Sendable, Equatable {
     // MARK: Misc
     public var driverOrPassengerPresent: Bool?
     public var handWashState: UInt32?
+    /// The car's clock, seconds since 1970. ``currentTime`` as a `Date`.
     public var currentTimeSeconds: Int64?
 
     // MARK: - Merge
@@ -213,17 +256,7 @@ public struct VehicleData: Sendable, Equatable {
     /// delta stream the Commander pushes.
     public func merged(onto base: VehicleData) -> VehicleData {
         var m = base
-        let mirror = Mirror(reflecting: self)
-        // Simple reflection-based merge; `nil` means "unchanged" per protocol.
-        // For a fast path, apply manually in your app if preferred.
-        for child in mirror.children {
-            if let label = child.label {
-                // Only overwrite when the new value is non-nil.
-                // (We can't easily set via Mirror; fall back to the hand-rolled merge below.)
-                _ = label
-            }
-        }
-        // Hand-rolled merge is faster and keeps us type-safe:
+        // `nil` means "unchanged" per protocol.
         if let v = speedKmh                  { m.speedKmh = v }
         if let v = accelPedalPercent         { m.accelPedalPercent = v }
         Self.merge(turnSignalLeft, turnSignalLeftRaw, into: &m.turnSignalLeft, &m.turnSignalLeftRaw)
@@ -239,20 +272,20 @@ public struct VehicleData: Sendable, Equatable {
         if let v = stoppingMode              { m.stoppingMode = v }
         if let v = wiperSpeed                { m.wiperSpeed = v }
         if let v = socPercent                { m.socPercent = v }
-        if let v = range                     { m.range = v }
+        if let v = rangeMiles                { m.rangeMiles = v }
         if let v = batteryVoltage            { m.batteryVoltage = v }
         if let v = batteryCurrent            { m.batteryCurrent = v }
         if let v = chargeStatus              { m.chargeStatus = v }
         if let v = idealEnergyRemaining      { m.idealEnergyRemaining = v }
-        if let v = maxRegenPowerKw           { m.maxRegenPowerKw = v }
-        if let v = maxDischargePowerKw       { m.maxDischargePowerKw = v }
-        if let v = nominalFullPackNewKwhTimes10 { m.nominalFullPackNewKwhTimes10 = v }
-        if let v = nominalFullPackNowKwhTimes10 { m.nominalFullPackNowKwhTimes10 = v }
-        if let v = nominalRemainingKwhTimes10 { m.nominalRemainingKwhTimes10 = v }
-        if let v = energyBufferKwhTimes10    { m.energyBufferKwhTimes10 = v }
-        if let v = tempPtInletC              { m.tempPtInletC = v }
-        if let v = tempBatteryInletC         { m.tempBatteryInletC = v }
-        if let v = tempInletTargetC          { m.tempInletTargetC = v }
+        if let v = maxRegenPower             { m.maxRegenPower = v }
+        if let v = maxDischargePower         { m.maxDischargePower = v }
+        if let v = nominalFullPackNew        { m.nominalFullPackNew = v }
+        if let v = nominalFullPackNow        { m.nominalFullPackNow = v }
+        if let v = nominalRemaining          { m.nominalRemaining = v }
+        if let v = energyBuffer              { m.energyBuffer = v }
+        if let v = tempPtInlet               { m.tempPtInlet = v }
+        if let v = tempBatteryInlet          { m.tempBatteryInlet = v }
+        if let v = tempInletTarget           { m.tempInletTarget = v }
         if let v = cellMaxTempC              { m.cellMaxTempC = v }
         if let v = cellMinTempC              { m.cellMinTempC = v }
         if let v = cellMaxVoltage            { m.cellMaxVoltage = v }
@@ -322,10 +355,10 @@ public struct VehicleData: Sendable, Equatable {
         if let v = childUnlockLeft           { m.childUnlockLeft = v }
         if let v = childUnlockRight          { m.childUnlockRight = v }
         if let v = outsideTempC              { m.outsideTempC = v }
-        if let v = brakeTempFrontLeftC       { m.brakeTempFrontLeftC = v }
-        if let v = brakeTempFrontRightC      { m.brakeTempFrontRightC = v }
-        if let v = brakeTempRearLeftC        { m.brakeTempRearLeftC = v }
-        if let v = brakeTempRearRightC       { m.brakeTempRearRightC = v }
+        if let v = brakeTempFrontLeft        { m.brakeTempFrontLeft = v }
+        if let v = brakeTempFrontRight       { m.brakeTempFrontRight = v }
+        if let v = brakeTempRearLeft         { m.brakeTempRearLeft = v }
+        if let v = brakeTempRearRight        { m.brakeTempRearRight = v }
         if let v = navCarLatitude            { m.navCarLatitude = v }
         if let v = navCarLongitude           { m.navCarLongitude = v }
         if let v = navCarLocationName        { m.navCarLocationName = v }
@@ -377,6 +410,51 @@ public struct VehicleData: Sendable, Equatable {
     }
 }
 
+// MARK: - In units
+
+/// The raw fields in SI units, with the scales seen in a Model 3 on 2026-10-19
+/// (README, "Units"). nil where the field is.
+public extension VehicleData {
+    /// ``rangeMiles`` in km.
+    var rangeKm: Double? { rangeMiles.map { Double($0) * 1.609344 } }
+
+    var batteryVolts: Double? { batteryVoltage.map { Double($0) / 100 } }
+    /// Negative while the pack gives energy.
+    var batteryAmps: Double? { batteryCurrent.map { Double($0) / 10 } }
+    /// Volts × amps: negative while the pack gives energy, positive while it charges.
+    var batteryPowerKw: Double? {
+        guard let volts = batteryVolts, let amps = batteryAmps else { return nil }
+        return volts * amps / 1000
+    }
+    var maxRegenPowerKw: Double? { maxRegenPower.map { Double($0) / 100 } }
+    var maxDischargePowerKw: Double? { maxDischargePower.map { Double($0) / 100 } }
+
+    var nominalFullPackNewKwh: Double? { nominalFullPackNew.map { Double($0) / 10 } }
+    var nominalFullPackNowKwh: Double? { nominalFullPackNow.map { Double($0) * 0.02 } }
+    var nominalRemainingKwh: Double? { nominalRemaining.map { Double($0) * 0.02 } }
+    var idealEnergyRemainingKwh: Double? { idealEnergyRemaining.map { Double($0) * 0.02 } }
+    var energyBufferKwh: Double? { energyBuffer.map { Double($0) / 100 } }
+    /// Energy the car can still use: ``nominalRemainingKwh`` less the buffer.
+    var usableEnergyKwh: Double? {
+        guard let remaining = nominalRemainingKwh, let buffer = energyBufferKwh else { return nil }
+        return max(0, remaining - buffer)
+    }
+
+    var cellMaxVolts: Double? { cellMaxVoltage.map { Double($0) * 0.002 } }
+    var cellMinVolts: Double? { cellMinVoltage.map { Double($0) * 0.002 } }
+
+    var acChargeTotalKwh: Double? { acChargeTotal.map { Double($0) / 1000 } }
+    var dcChargeTotalKwh: Double? { dcChargeTotal.map { Double($0) / 1000 } }
+    var regenTotalKwh: Double? { regenTotal.map { Double($0) / 1000 } }
+    var dischargeTotalKwh: Double? { dischargeTotal.map { Double($0) / 1000 } }
+
+    var lowBusVolts: Double? { lowBusVoltage.map { Double($0) / 100 } }
+    var lowBusAmps: Double? { lowBusCurrent.map { Double($0) / 10 } }
+    var highBusVolts: Double? { highBusVoltage.map { Double($0) / 10 } }
+
+    var currentTime: Date? { currentTimeSeconds.map { Date(timeIntervalSince1970: TimeInterval($0)) } }
+}
+
 // MARK: - Enum sidecars
 //
 // Raw values are the Commander's wire values. Every typed field keeps its
@@ -386,18 +464,18 @@ public struct VehicleData: Sendable, Equatable {
 
 /// Shifter position, field 66.
 ///
-/// This declaration is the only place the mapping lives: if the car
-/// disagrees, change the numbers here. Not confirmed for field 66, which the
-/// descriptor types as a bare `uint32`. The values are Tesla's DI_gear
-/// (0 invalid, 1 P, 2 R, 3 N, 4 D, 7 SNA), which is how Enhauto's app reads the
-/// Commander's gear on its dashboard endpoint (`CDashboardData::UpdateGearValue`:
-/// 2 R, 3 N, 4 D, anything else P). 0 and 7 have no case and only show up in
-/// ``VehicleData/gearRaw``.
+/// This declaration is the only place the mapping lives. Field 66 is a bare
+/// `uint32` in the descriptor; the values are Tesla's DI_gear (0 invalid, 1 P,
+/// 2 R, 3 N, 4 D, 7 SNA), confirmed in a Model 3 on 2026-10-19 by shifting
+/// P → R → N → D → P (1 → 2 → 3 → 4 → 1). Enhauto's app reads it the same way on
+/// its dashboard endpoint (`CDashboardData::UpdateGearValue`). 0 and 7 have no
+/// case and only show up in ``VehicleData/gearRaw``.
 public enum Gear: UInt32, Sendable { case park = 1, reverse = 2, neutral = 3, drive = 4 }
 
 /// `TurnSignalStatus` in the descriptor: 0 off, 1 active low, 2 active high.
-/// Both active values mean the indicator is on; what tells them apart is not
-/// confirmed, the `…Raw` fields keep it.
+/// Both active values mean the indicator is on: they alternate with the lamp,
+/// 2 lit and 1 dark, about 0.36 s each (seen in a Model 3 on 2026-10-19). The
+/// `…Raw` fields keep them, for blinking in step with the car.
 public enum TurnSignalStatus: UInt32, Sendable {
     case off = 0, on = 1
 
@@ -426,7 +504,9 @@ public enum BlindSpotState: UInt32, Sendable {
 
 /// `LatchStatus` in the descriptor: 0 SNA, 1 opened, 2 closed, 3 closing,
 /// 4 opening, 5 ajar, 6 timeout, 7 default, 8 fault. Closing and opening count
-/// as open; SNA, timeout, default and fault have no case.
+/// as open; SNA, timeout, default and fault have no case. Seen in a Model 3 on
+/// 2026-10-19: doors and frunk 1 and 2, the powered trunk 2 → 1 when opened
+/// (no 4) and 1 → 3 → 2 when closed.
 public enum LatchStatus: UInt32, Sendable {
     case closed = 2, open = 1, ajar = 5
 
@@ -440,9 +520,11 @@ public enum LatchStatus: UInt32, Sendable {
     }
 }
 
-/// `MediaPlaybackStatus` in the descriptor, same values.
+/// `MediaPlaybackStatus` in the descriptor, same values (1 and 2 seen with Spotify
+/// and DAB radio).
 public enum MediaPlaybackStatus: UInt32, Sendable { case stopped = 0, playing = 1, paused = 2 }
-/// `MediaSourceType` in the descriptor, same values.
+/// `MediaSourceType` in the descriptor, same values. Spotify came as 12, and DAB
+/// radio as 13, which the descriptor calls US radio.
 public enum MediaSource: UInt32, Sendable {
     case none = 0, am = 1, fm = 2, xm = 3, slacker = 5, localFiles = 6, iPod = 7
     case bluetooth = 8, auxIn = 9, dab = 10, rdio = 11, spotify = 12, usRadio = 13
@@ -490,23 +572,23 @@ enum VehicleDataDecoder {
             case (24, 0):  v.displayBrightness = UInt32(truncatingIfNeeded: try r.readVarint())
             case (25, 0):  v.displayState = UInt32(truncatingIfNeeded: try r.readVarint())
             case (26, 0):  v.displayTheme = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (27, 0):  v.outsideTempC = varintAsInt32(try r.readVarint())
+            case (27, 0):  v.outsideTempC = zigzag32(try r.readVarint())
             // BMS
             case (28, 0):  v.batteryVoltage = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (29, 0):  v.batteryCurrent = varintAsInt32(try r.readVarint())
+            case (29, 0):  v.batteryCurrent = zigzag32(try r.readVarint())
             case (30, 0):  v.chargeStatus = UInt32(truncatingIfNeeded: try r.readVarint())
             case (31, 0):  v.idealEnergyRemaining = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (32, 0):  v.maxRegenPowerKw = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (33, 0):  v.maxDischargePowerKw = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (34, 0):  v.nominalFullPackNewKwhTimes10 = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (35, 0):  v.nominalFullPackNowKwhTimes10 = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (36, 0):  v.nominalRemainingKwhTimes10 = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (37, 0):  v.energyBufferKwhTimes10 = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (38, 0):  v.tempPtInletC = varintAsInt32(try r.readVarint())
-            case (39, 0):  v.tempBatteryInletC = varintAsInt32(try r.readVarint())
-            case (40, 0):  v.tempInletTargetC = varintAsInt32(try r.readVarint())
-            case (41, 0):  v.cellMaxTempC = varintAsInt32(try r.readVarint())
-            case (42, 0):  v.cellMinTempC = varintAsInt32(try r.readVarint())
+            case (32, 0):  v.maxRegenPower = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (33, 0):  v.maxDischargePower = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (34, 0):  v.nominalFullPackNew = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (35, 0):  v.nominalFullPackNow = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (36, 0):  v.nominalRemaining = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (37, 0):  v.energyBuffer = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (38, 0):  v.tempPtInlet = zigzag32(try r.readVarint())
+            case (39, 0):  v.tempBatteryInlet = zigzag32(try r.readVarint())
+            case (40, 0):  v.tempInletTarget = zigzag32(try r.readVarint())
+            case (41, 0):  v.cellMaxTempC = zigzag32(try r.readVarint())
+            case (42, 0):  v.cellMinTempC = zigzag32(try r.readVarint())
             case (43, 0):  v.cellMaxVoltage = UInt32(truncatingIfNeeded: try r.readVarint())
             case (44, 0):  v.cellMinVoltage = UInt32(truncatingIfNeeded: try r.readVarint())
             case (45, 0):  v.acChargeTotal = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -515,16 +597,16 @@ enum VehicleDataDecoder {
             case (48, 0):  v.dischargeTotal = UInt32(truncatingIfNeeded: try r.readVarint())
             case (49, 0):  v.batteryHeatingState = UInt32(truncatingIfNeeded: try r.readVarint())
             // Drivetrain
-            case (50, 0):  v.frontTorque = varintAsInt32(try r.readVarint())
-            case (51, 0):  v.frontPowerKw = varintAsInt32(try r.readVarint())
-            case (52, 0):  v.rearTorque = varintAsInt32(try r.readVarint())
-            case (53, 0):  v.rearPowerKw = varintAsInt32(try r.readVarint())
-            case (54, 0):  v.rearRightTorque = varintAsInt32(try r.readVarint())
-            case (55, 0):  v.rearRightPowerKw = varintAsInt32(try r.readVarint())
+            case (50, 0):  v.frontTorque = zigzag32(try r.readVarint())
+            case (51, 0):  v.frontPowerKw = zigzag32(try r.readVarint())
+            case (52, 0):  v.rearTorque = zigzag32(try r.readVarint())
+            case (53, 0):  v.rearPowerKw = zigzag32(try r.readVarint())
+            case (54, 0):  v.rearRightTorque = zigzag32(try r.readVarint())
+            case (55, 0):  v.rearRightPowerKw = zigzag32(try r.readVarint())
             case (56, 0):  v.trackModeStability = UInt32(truncatingIfNeeded: try r.readVarint())
             case (57, 0):  v.trackModeHandling = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (58, 0):  v.tempFrontStatorC = varintAsInt32(try r.readVarint())
-            case (59, 0):  v.tempRearStatorC = varintAsInt32(try r.readVarint())
+            case (58, 0):  v.tempFrontStatorC = zigzag32(try r.readVarint())
+            case (59, 0):  v.tempRearStatorC = zigzag32(try r.readVarint())
             case (60, 0):  v.invertersCount = UInt32(truncatingIfNeeded: try r.readVarint())
             // Driving state
             case (61, 0):  v.speedKmh = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -542,11 +624,11 @@ enum VehicleDataDecoder {
             case (73, 0):  v.stoppingMode = UInt32(truncatingIfNeeded: try r.readVarint())
             case (74, 0):  v.wiperSpeed = UInt32(truncatingIfNeeded: try r.readVarint())
             // Charging
-            case (75, 0):  v.chargingDcCurrent = varintAsInt32(try r.readVarint())
-            case (76, 0):  v.chargingDcVoltage = varintAsInt32(try r.readVarint())
-            case (77, 0):  v.lowBusVoltage = varintAsInt32(try r.readVarint())
-            case (78, 0):  v.lowBusCurrent = varintAsInt32(try r.readVarint())
-            case (79, 0):  v.highBusVoltage = varintAsInt32(try r.readVarint())
+            case (75, 0):  v.chargingDcCurrent = zigzag32(try r.readVarint())
+            case (76, 0):  v.chargingDcVoltage = zigzag32(try r.readVarint())
+            case (77, 0):  v.lowBusVoltage = zigzag32(try r.readVarint())
+            case (78, 0):  v.lowBusCurrent = zigzag32(try r.readVarint())
+            case (79, 0):  v.highBusVoltage = zigzag32(try r.readVarint())
             // Lights
             case (80, 0):  v.lightsDrl = UInt32(truncatingIfNeeded: try r.readVarint())
             case (81, 0):  v.lightsLowBeam = UInt32(truncatingIfNeeded: try r.readVarint())
@@ -583,7 +665,7 @@ enum VehicleDataDecoder {
             case (110, 0): v.autopilotSpeedLimit = UInt32(truncatingIfNeeded: try r.readVarint())
             // Trip
             case (111, 0): v.socPercent = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (112, 0): v.range = UInt32(truncatingIfNeeded: try r.readVarint())
+            case (112, 0): v.rangeMiles = UInt32(truncatingIfNeeded: try r.readVarint())
             // Doors
             case (113, 0): (v.doorFrontLeft, v.doorFrontLeftRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
             case (114, 0): (v.doorFrontRight, v.doorFrontRightRaw) = enumField(try r.readVarint(), LatchStatus.init(wireValue:))
@@ -596,12 +678,12 @@ enum VehicleDataDecoder {
             case (121, 0): v.childUnlockRight = UInt32(truncatingIfNeeded: try r.readVarint())
             // Misc
             case (122, 0): v.handWashState = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (123, 0): v.currentTimeSeconds = Int64(bitPattern: try r.readVarint())
+            case (123, 0): v.currentTimeSeconds = zigzag64(try r.readVarint())
             case (124, 0): v.rideAndHandling = UInt32(truncatingIfNeeded: try r.readVarint())
-            case (125, 0): v.brakeTempFrontLeftC = varintAsInt32(try r.readVarint())
-            case (126, 0): v.brakeTempFrontRightC = varintAsInt32(try r.readVarint())
-            case (127, 0): v.brakeTempRearLeftC = varintAsInt32(try r.readVarint())
-            case (128, 0): v.brakeTempRearRightC = varintAsInt32(try r.readVarint())
+            case (125, 0): v.brakeTempFrontLeft = zigzag32(try r.readVarint())
+            case (126, 0): v.brakeTempFrontRight = zigzag32(try r.readVarint())
+            case (127, 0): v.brakeTempRearLeft = zigzag32(try r.readVarint())
+            case (128, 0): v.brakeTempRearRight = zigzag32(try r.readVarint())
             case (129, 0): v.driverOrPassengerPresent = (try r.readVarint()) != 0
             default:
                 try r.skip(wire: t.wire)

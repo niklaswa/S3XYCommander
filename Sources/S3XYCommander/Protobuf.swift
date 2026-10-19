@@ -80,8 +80,17 @@ enum ProtoError: Error, CustomStringConvertible {
     }
 }
 
-// Decode a signed int that was encoded as a bare varint (NOT zigzag),
-// matching how proto's `sint32`/`int32` fields are serialised by the
-// Enhauto firmware's `sint32` entries in PushVehicleDataHolder.
+// An `int32` field: two's complement in a plain varint (-1 is ten bytes).
+// The scroll ticks of the vehicle events and the media durations are these.
 @inline(__always)
 func varintAsInt32(_ v: UInt64) -> Int32 { Int32(truncatingIfNeeded: v) }
+
+// A `sint32` field: zigzag (0, -1, 1, -2 … go on the wire as 0, 1, 2, 3 …).
+// Every signed value of PushVehicleDataHolder except the media durations is
+// one; read as a plain varint it comes out doubled, and negative ones positive.
+@inline(__always)
+func zigzag32(_ v: UInt64) -> Int32 { Int32(truncatingIfNeeded: zigzag64(v)) }
+
+// A `sint64` field: zigzag, 64 bits.
+@inline(__always)
+func zigzag64(_ v: UInt64) -> Int64 { Int64(bitPattern: v >> 1) ^ -Int64(bitPattern: v & 1) }

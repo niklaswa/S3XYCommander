@@ -21,7 +21,7 @@ final class VehicleDataTests: XCTestCase {
         XCTAssertEqual(v.gear, .drive)
         XCTAssertEqual(v.gearRaw, 4)
         XCTAssertEqual(v.socPercent, 72)
-        XCTAssertEqual(v.range, 314)
+        XCTAssertEqual(v.rangeMiles, 314)
     }
 
     func testGearFollowsDIGear() throws {

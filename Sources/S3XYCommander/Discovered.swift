@@ -4,7 +4,8 @@ import CoreBluetooth
 /// A Commander found by ``S3XYCommanderClient/scan(timeout:)``.
 ///
 /// Keep this value around to pass it to ``S3XYCommanderClient/connect(to:pairingAuthorizationHandler:)``.
-public struct DiscoveredCommander: Sendable, Hashable, Identifiable {
+// `@unchecked`: CBPeripheral is not Sendable, and the client only touches it on the main actor.
+public struct DiscoveredCommander: @unchecked Sendable, Hashable, Identifiable {
     /// iOS-generated opaque identifier for the physical device.
     /// (CoreBluetooth never exposes the real BLE MAC on iOS/macOS.)
     public let id: UUID

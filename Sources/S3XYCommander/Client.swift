@@ -145,6 +145,7 @@ public final class S3XYCommanderClient: NSObject {
     private var pendingCmdRead: ((Result<Data, Error>) -> Void)?
 
     private var vehicleDataContinuations: [UUID: AsyncStream<CommanderObservation>.Continuation] = [:]
+    private var eventContinuations: [UUID: AsyncStream<SteeringWheelEvents>.Continuation] = [:]
     private var latestObservation: CommanderObservation {
         CommanderObservation(
             phase: currentPhase,
@@ -268,6 +269,33 @@ public final class S3XYCommanderClient: NSObject {
         }
     }
 
+    /// Ask for the steering wheel's scroll wheels: presses, tilts and turns then
+    /// come through ``steeringWheelEvents``. Returns when the Commander agreed.
+    public func subscribeSteeringWheelEvents() async throws {
+        guard let sec = sec, let cmdCh = endpoints[S3XYCommander.Endpoint.cmd] else {
+            throw CommanderError.notSessionReady
+        }
+        let resp = try await writeAndRead(cmd: sec.encrypt(Build.subscribeVehicleEvents()), on: cmdCh)
+        let (_, status) = try Parse.respStatus(sec.decrypt(resp))
+        guard status == .success else { throw CommanderError.subscribeRejected(status: status) }
+    }
+
+    /// One value per events push, after ``subscribeSteeringWheelEvents()``. Only
+    /// what changed is set, as with the vehicle data.
+    public var steeringWheelEvents: AsyncStream<SteeringWheelEvents> {
+        AsyncStream { continuation in
+            let id = UUID()
+            Task { @MainActor [weak self] in
+                self?.eventContinuations[id] = continuation
+            }
+            continuation.onTermination = { _ in
+                Task { @MainActor [weak self] in
+                    self?.eventContinuations.removeValue(forKey: id)
+                }
+            }
+        }
+    }
+
     /// Fire a one-shot action - tell the Commander to emulate a steering-wheel
     /// / stalk / screen button press on the Tesla's CAN bus. Equivalent to
     /// what the official S3XY app's "Try Action" button does.
@@ -309,6 +337,22 @@ public final class S3XYCommanderClient: NSObject {
             logger.notice("TryAction rejected: \(status.description)")
         }
         return status
+    }
+
+    // ─── Diagnostics ───────────────────────────────────────────
+    /// Every push as it arrived, decrypted, whatever its type — for tools that look past the
+    /// vehicle data (`PushVehicleDataHolder` is one of two dozen push types). Called on the
+    /// main actor before the push is decoded.
+    public var onRawPush: ((Data) -> Void)?
+
+    /// Sends a plaintext `EnhApiPayloadHolder` the caller built over the encrypted command
+    /// channel and returns the decrypted answer — for requests this library does not model.
+    public func sendRawCommand(_ plain: Data) async throws -> Data {
+        guard let sec = sec, let ch = endpoints[S3XYCommander.Endpoint.cmd] else {
+            throw CommanderError.notSessionReady
+        }
+        let resp = try await writeAndRead(cmd: sec.encrypt(plain), on: ch)
+        return sec.decrypt(resp)
     }
 
     /// Explicitly disconnect and reset state. Safe to call multiple times.
@@ -435,12 +479,20 @@ public final class S3XYCommanderClient: NSObject {
     private func handlePush(_ data: Data) {
         pushCount += 1
         let payloadBytes = pushPlaintext ? data : (sec?.decrypt(data) ?? data)
+        onRawPush?(payloadBytes)
         do {
-            if let pvh = try Parse.vehicleDataPushPayload(payloadBytes) {
+            let push = try Parse.push(payloadBytes)
+            switch (push.type, push.payload) {
+            case (PushType.VehicleDataHolder, let pvh?):
                 let delta = try VehicleDataDecoder.decode(pvh)
                 latestDelta = delta
                 accumulated = delta.merged(onto: accumulated)
                 publishLatest()
+            case (PushType.VehicleEventsDataHolder, let events?):
+                let decoded = try SteeringWheelEventsDecoder.decode(events)
+                for (_, c) in eventContinuations { c.yield(decoded) }
+            default:
+                break
             }
         } catch {
             logger.error("push parse error: \(String(describing: error))")
